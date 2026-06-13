@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Orientation Visualizer</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h2 { margin-top: 0; color: #ffca28; text-align: center; }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            width: 100%;
+            max-width: 1200px;
+        }
+        .panels {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            flex: 1;
+            min-width: 320px;
+        }
+        .panel {
+            background: #1e1e1e;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            border: 1px solid #333;
+        }
+        .panel h3 {
+            margin-top: 0;
+            border-bottom: 2px solid #ffca28;
+            padding-bottom: 10px;
+            color: #ffca28;
+        }
+        .form-group { margin-bottom: 15px; }
+        .label-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        label {
+            font-weight: bold;
+            font-size: 0.9em;
+            color: #bbb;
+        }
+        .angle-readout {
+            font-family: monospace;
+            font-size: 0.95em;
+            font-weight: bold;
+        }
+        
+        /* Input Styling */
+        input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #444;
+            background: #2a2a2a;
+            color: #fff;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-family: monospace;
+            font-size: 1em;
+        }
+        input[type="number"]:focus { border-color: #ffca28; outline: none; }
+        
+        /* Slider Specific Styling */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            background: #333;
+            height: 6px;
+            border-radius: 3px;
+            outline: none;
+            margin: 12px 0 6px 0;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #ffca28;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #ffca28;
+            cursor: pointer;
+            border: none;
+            transition: transform 0.1s;
+        }
+        input[type="range"]::-moz-range-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* Matrix Grid Styles */
+        .matrix-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .matrix-grid input {
+            text-align: center;
+            padding: 8px 4px;
+        }
+
+        #canvas-container {
+            flex: 2;
+            min-width: 400px;
+            background: #0a0a0a;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #333;
+            min-height: 550px;
+            position: relative;
+        }
+        .legend {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            pointer-events: none;
+            border: 1px solid #444;
+        }
+        .legend span { display: block; margin-bottom: 6px; }
+        .c-yaw { color: #55ff55; }   
+        .c-pitch { color: #ff5555; } 
+        .c-roll { color: #5555ff; }  
+
+        footer {
+            margin-top: 40px;
+            color: #666;
+            font-size: 0.9em;
+            text-align: center;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Euler, Quaternion & Matrix Visualizer</h2>
+
+    <div class="container">
+        <div class="panels">
+            <div class="panel">
+                <h3>Euler Angles</h3>
+                <div class="form-group">
+                    <div class="label-container">
+                        <label for="yaw" class="c-yaw">Yaw / Heading (Y-Axis)</label>
+                        <span id="yaw-txt" class="angle-readout c-yaw">0.0°</span>
+                    </div>
+                    <input type="range" id="yaw" min="-180" max="180" step="0.1" value="0">
+                </div>
+                <div class="form-group">
+                    <div class="label-container">
+                        <label for="pitch" class="c-pitch">Pitch (X-Axis)</label>
+                        <span id="pitch-txt" class="angle-readout c-pitch">0.0°</span>
+                    </div>
+                    <input type="range" id="pitch" min="-180" max="180" step="0.1" value="0">
+                </div>
+                <div class="form-group">
+                    <div class="label-container">
+                        <label for="roll" class="c-roll">Roll (Z-Axis)</label>
+                        <span id="roll-txt" class="angle-readout c-roll">0.0°</span>
+                    </div>
+                    <input type="range" id="roll" min="-180" max="180" step="0.1" value="0">
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>Quaternion (Normalized)</h3>
+                <div class="form-group">
+                    <label for="qx">X (i)</label>
+                    <input type="number" id="qx" step="any" value="0">
+                </div>
+                <div class="form-group">
+                    <label for="qy">Y (j)</label>
+                    <input type="number" id="qy" step="any" value="0">
+                </div>
+                <div class="form-group">
+                    <label for="qz">Z (k)</label>
+                    <input type="number" id="qz" step="any" value="0">
+                </div>
+                <div class="form-group">
+                    <label for="qw">W (Real)</label>
+                    <input type="number" id="qw" step="any" value="1">
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>Rotation Matrix (3x3)</h3>
+                <div class="matrix-grid">
+                    <input type="number" id="m11" step="any" value="1">
+                    <input type="number" id="m12" step="any" value="0">
+                    <input type="number" id="m13" step="any" value="0">
+                    <input type="number" id="m21" step="any" value="0">
+                    <input type="number" id="m22" step="any" value="1">
+                    <input type="number" id="m23" step="any" value="0">
+                    <input type="number" id="m31" step="any" value="0">
+                    <input type="number" id="m32" step="any" value="0">
+                    <input type="number" id="m33" step="any" value="1">
+                </div>
+            </div>
+        </div>
+
+        <div id="canvas-container">
+            <div class="legend">
+                <span><strong>Aviation Standard Mapping:</strong></span>
+                <span class="c-yaw">■ Yaw orbits the Vertical (Green)</span>
+                <span class="c-pitch">■ Pitch orbits the Wings (Red)</span>
+                <span class="c-roll">■ Roll orbits the Nose-Tail (Blue)</span>
+                <span style="color: #aaa; margin-top: 10px; font-size: 0.9em;">Click & Drag to move camera</span>
+            </div>
+        </div>
+    </div>
+
+    <footer>from YJK, with 🧀</footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        // --- 1. DOM Elements & State ---
+        const inputsEuler = {
+            yaw: document.getElementById('yaw'),
+            pitch: document.getElementById('pitch'),
+            roll: document.getElementById('roll')
+        };
+        const textsEuler = {
+            yaw: document.getElementById('yaw-txt'),
+            pitch: document.getElementById('pitch-txt'),
+            roll: document.getElementById('roll-txt')
+        };
+        const inputsQuat = {
+            x: document.getElementById('qx'),
+            y: document.getElementById('qy'),
+            z: document.getElementById('qz'),
+            w: document.getElementById('qw')
+        };
+        const inputsMatrix = {
+            m11: document.getElementById('m11'), m12: document.getElementById('m12'), m13: document.getElementById('m13'),
+            m21: document.getElementById('m21'), m22: document.getElementById('m22'), m23: document.getElementById('m23'),
+            m31: document.getElementById('m31'), m32: document.getElementById('m32'), m33: document.getElementById('m33')
+        };
+
+        const degToRad = Math.PI / 180.0;
+        const radToDeg = 180.0 / Math.PI;
+
+        let isUpdating = false;
+
+        // --- 2. Three.js Setup ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        
+        const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
+        scene.add(gridHelper);
+
+        const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(8, 6, 8);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(10, 20, 10);
+        scene.add(dirLight);
+
+        // --- 3. Construct 3D Reference Object ---
+        const objectGroup = new THREE.Group();
+        objectGroup.rotation.order = 'YXZ'; 
+        scene.add(objectGroup);
+
+        const fuselageGeo = new THREE.BoxGeometry(1, 1, 5);
+        const fuselageMat = new THREE.MeshPhongMaterial({ color: 0xcccccc });
+        const fuselage = new THREE.Mesh(fuselageGeo, fuselageMat);
+        objectGroup.add(fuselage);
+
+        const wingGeo = new THREE.BoxGeometry(6, 0.2, 1.2);
+        const wingMat = new THREE.MeshPhongMaterial({ color: 0xcc3333 });
+        const wings = new THREE.Mesh(wingGeo, wingMat);
+        wings.position.set(0, 0.2, -0.5);
+        objectGroup.add(wings);
+
+        const tailGeo = new THREE.BoxGeometry(2.5, 0.2, 1);
+        const tailMat = new THREE.MeshPhongMaterial({ color: 0x3333cc });
+        const tail = new THREE.Mesh(tailGeo, tailMat);
+        tail.position.set(0, 0.2, 2);
+        objectGroup.add(tail);
+
+        const finGeo = new THREE.BoxGeometry(0.2, 1.5, 1);
+        const fin = new THREE.Mesh(finGeo, tailMat);
+        fin.position.set(0, 0.8, 2);
+        objectGroup.add(fin);
+
+        const noseGeo = new THREE.ConeGeometry(0.5, 1.5, 16);
+        const noseMat = new THREE.MeshPhongMaterial({ color: 0xeebb00 });
+        const nose = new THREE.Mesh(noseGeo, noseMat);
+        nose.rotation.x = -Math.PI / 2;
+        nose.position.set(0, 0, -3.25);
+        objectGroup.add(nose);
+
+        const axesHelper = new THREE.AxesHelper(4);
+        objectGroup.add(axesHelper);
+
+        // --- 4. Render Loop & Resize ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        // --- 5. Bidirectional Data Binding ---
+
+        function updateAllUIFromObject() {
+            // Update Euler Sliders & Text Readouts
+            const e = new THREE.Euler().setFromQuaternion(objectGroup.quaternion, 'YXZ');
+            const yawDeg = e.y * radToDeg;
+            const pitchDeg = e.x * radToDeg;
+            const rollDeg = e.z * radToDeg;
+
+            inputsEuler.yaw.value = yawDeg;
+            inputsEuler.pitch.value = pitchDeg;
+            inputsEuler.roll.value = rollDeg;
+
+            textsEuler.yaw.textContent = yawDeg.toFixed(1) + '°';
+            textsEuler.pitch.textContent = pitchDeg.toFixed(1) + '°';
+            textsEuler.roll.textContent = rollDeg.toFixed(1) + '°';
+
+            // Update Quaternion UI
+            const q = objectGroup.quaternion;
+            inputsQuat.x.value = q.x.toFixed(5);
+            inputsQuat.y.value = q.y.toFixed(5);
+            inputsQuat.z.value = q.z.toFixed(5);
+            inputsQuat.w.value = q.w.toFixed(5);
+
+            // Update Matrix UI
+            objectGroup.updateMatrix();
+            const te = objectGroup.matrix.elements;
+            inputsMatrix.m11.value = te[0].toFixed(4); inputsMatrix.m12.value = te[4].toFixed(4); inputsMatrix.m13.value = te[8].toFixed(4);
+            inputsMatrix.m21.value = te[1].toFixed(4); inputsMatrix.m22.value = te[5].toFixed(4); inputsMatrix.m23.value = te[9].toFixed(4);
+            inputsMatrix.m31.value = te[2].toFixed(4); inputsMatrix.m32.value = te[6].toFixed(4); inputsMatrix.m33.value = te[10].toFixed(4);
+        }
+
+        function updateFromEuler() {
+            if (isUpdating) return;
+            isUpdating = true;
+
+            const yaw = parseFloat(inputsEuler.yaw.value) || 0;
+            const pitch = parseFloat(inputsEuler.pitch.value) || 0;
+            const roll = parseFloat(inputsEuler.roll.value) || 0;
+
+            objectGroup.rotation.set(pitch * degToRad, yaw * degToRad, roll * degToRad, 'YXZ');
+            
+            updateAllUIFromObject();
+            isUpdating = false;
+        }
+
+        function updateFromQuaternion() {
+            if (isUpdating) return;
+            isUpdating = true;
+
+            let x = parseFloat(inputsQuat.x.value) || 0;
+            let y = parseFloat(inputsQuat.y.value) || 0;
+            let z = parseFloat(inputsQuat.z.value) || 0;
+            let w = parseFloat(inputsQuat.w.value);
+            if (isNaN(w)) w = 1.0;
+
+            const q = new THREE.Quaternion(x, y, z, w);
+            if (q.lengthSq() === 0) {
+                q.set(0, 0, 0, 1);
+            } else {
+                q.normalize();
+            }
+
+            objectGroup.quaternion.copy(q);
+
+            updateAllUIFromObject();
+            isUpdating = false;
+        }
+
+        function updateFromMatrix() {
+            if (isUpdating) return;
+            isUpdating = true;
+
+            const m = new THREE.Matrix4();
+            m.set(
+                parseFloat(inputsMatrix.m11.value) || 0, parseFloat(inputsMatrix.m12.value) || 0, parseFloat(inputsMatrix.m13.value) || 0, 0,
+                parseFloat(inputsMatrix.m21.value) || 0, parseFloat(inputsMatrix.m22.value) || 0, parseFloat(inputsMatrix.m23.value) || 0, 0,
+                parseFloat(inputsMatrix.m31.value) || 0, parseFloat(inputsMatrix.m32.value) || 0, parseFloat(inputsMatrix.m33.value) || 0, 0,
+                0, 0, 0, 1
+            );
+
+            const q = new THREE.Quaternion().setFromRotationMatrix(m);
+            q.normalize();
+            objectGroup.quaternion.copy(q);
+
+            updateAllUIFromObject();
+            isUpdating = false;
+        }
+
+        // Attach Event Listeners
+        Object.values(inputsEuler).forEach(input => input.addEventListener('input', updateFromEuler));
+        Object.values(inputsQuat).forEach(input => input.addEventListener('input', updateFromQuaternion));
+        Object.values(inputsMatrix).forEach(input => input.addEventListener('input', updateFromMatrix));
+
+        // Initial Sync
+        updateFromEuler();
+
+    </script>
+</body>
+</html>
